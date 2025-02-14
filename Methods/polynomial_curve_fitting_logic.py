@@ -1,105 +1,102 @@
-
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
-from PyQt6.QtWidgets import (
-    QApplication,
-    QMainWindow,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-    QMessageBox,
-)
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QLineEdit, QPushButton, QMessageBox
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 
 class PolynomialCurveFittingWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        # Set window title and size
-        self.setWindowTitle("Quadratic Curve Fitting")
-        self.setGeometry(100, 100, 400, 300)
+        self.setWindowTitle("Polynomial Curve Fitting (Least Squares)")
+        self.setGeometry(100, 100, 800, 600)
 
-        # Create central widget and layout
+        # Central widget and layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        layout = QVBoxLayout()
+        layout = QVBoxLayout(central_widget)
 
-        # Input fields for data points
-        self.input_label = QLabel("Enter data points as (x, y) pairs, separated by commas:")
-        layout.addWidget(self.input_label)
+        # Label and Input for Data Points
+        layout.addWidget(QLabel("Enter data points (comma-separated, e.g., 0,0;1,1;2,4;3,9;4,16):"))
+        self.data_input = QLineEdit()
+        self.data_input.setPlaceholderText("0,0;1,1;2,4;3,9;4,16")
+        layout.addWidget(self.data_input)
 
-        self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText("Example: 0,0 1,1 2,4 3,9 4,16")
-        layout.addWidget(self.input_field)
-
-        # Calculate button
-        self.calculate_button = QPushButton("Calculate")
-        self.calculate_button.clicked.connect(self.calculate_curve)
+        # Buttons
+        self.calculate_button = QPushButton("Compute Polynomial Fit")
+        self.calculate_button.clicked.connect(self.compute_curve_fit)
         layout.addWidget(self.calculate_button)
 
-        # Plot button
-        self.plot_button = QPushButton("Plot")
+        self.plot_button = QPushButton("Plot Fitted Curve")
         self.plot_button.clicked.connect(self.plot_curve)
-        self.plot_button.setEnabled(False)  # Disabled until calculation is done
         layout.addWidget(self.plot_button)
 
-        # Result label
-        self.result_label = QLabel("Result will be shown here.")
-        self.result_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.result_label)
+        # Matplotlib figure and canvas
+        self.figure, self.ax = plt.subplots()
+        self.canvas = FigureCanvas(self.figure)
+        layout.addWidget(self.canvas)
 
-        # Set layout
-        central_widget.setLayout(layout)
-
-        # Store coefficients
-        self.coefficients = None
-
-    def calculate_curve(self):
+    def parse_data(self):
+        """ Parse user input and return x, y data arrays. """
         try:
-            # Get input data
-            input_text = self.input_field.text().strip()
-            if not input_text:
-                raise ValueError("Input field is empty.")
-
-            # Parse input into (x, y) pairs
-            data_points = [tuple(map(float, point.split(','))) for point in input_text.split()]
-            x = np.array([point[0] for point in data_points])
-            y = np.array([point[1] for point in data_points])
-
-            # Fit quadratic curve using least squares
-            A = np.vstack([x**2, x, np.ones_like(x)]).T
-            self.coefficients = np.linalg.lstsq(A, y, rcond=None)[0]
-
-            # Display result
-            a, b, c = self.coefficients
-            self.result_label.setText(f"Fitted curve: y = {a:.2f}x² + {b:.2f}x + {c:.2f}")
-            self.plot_button.setEnabled(True)
-
+            raw_data = self.data_input.text().strip()
+            points = [tuple(map(float, p.split(','))) for p in raw_data.split(';')]
+            x_values, y_values = zip(*points)
+            return np.array(x_values), np.array(y_values)
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Invalid input: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Invalid data input: {e}")
+            return None, None
 
-    def plot_curve(self):
-        if self.coefficients is None:
-            QMessageBox.warning(self, "Warning", "No curve has been calculated yet.")
+    def compute_curve_fit(self):
+        """ Compute least squares polynomial fit and display equation. """
+        x, y = self.parse_data()
+        if x is None:
             return
 
-        # Generate points for the fitted curve
-        x = np.linspace(0, 4, 100)
-        a, b, c = self.coefficients
-        y = a * x**2 + b * x + c
+        # Construct the design matrix
+        A = np.vstack([x ** 2, x, np.ones_like(x)]).T
+        # Solve for coefficients using least squares
+        coeffs = np.linalg.lstsq(A, y, rcond=None)[0]
 
-        # Plot the curve and data points
-        plt.figure()
-        plt.plot(x, y, label="Fitted Curve")
-        plt.scatter([0, 1, 2, 3, 4], [0, 1, 4, 9, 16], color="red", label="Data Points")
-        plt.xlabel("x")
-        plt.ylabel("y")
-        plt.title("Quadratic Curve Fitting")
-        plt.legend()
-        plt.grid(True)
-        plt.show()
+        # Store coefficients for plotting
+        self.coeffs = coeffs
 
+        # Display equation
+        equation = f"y = {coeffs[0]:.4f}x² + {coeffs[1]:.4f}x + {coeffs[2]:.4f}"
+        QMessageBox.information(self, "Polynomial Fit", f"Computed equation:\n{equation}")
+
+    def plot_curve(self):
+        """ Plot the original data points and fitted quadratic curve. """
+        x, y = self.parse_data()
+        if x is None or not hasattr(self, 'coeffs'):
+            return
+
+        # Generate fitted curve
+        x_fit = np.linspace(min(x), max(x), 100)
+        y_fit = self.coeffs[0] * x_fit ** 2 + self.coeffs[1] * x_fit + self.coeffs[2]
+
+        # Clear previous plot
+        self.ax.clear()
+
+        # Plot original data points
+        self.ax.scatter(x, y, color="red", label="Data Points")
+
+        # Plot fitted curve
+        self.ax.plot(x_fit, y_fit, color="blue", label="Fitted Curve (Quadratic)")
+
+        self.ax.set_xlabel("x")
+        self.ax.set_ylabel("y")
+        self.ax.set_title("Polynomial Curve Fitting")
+        self.ax.legend()
+        self.ax.grid()
+
+        # Redraw the canvas
+        self.canvas.draw()
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = PolynomialCurveFittingWindow()
+    window.show()
+    sys.exit(app.exec())

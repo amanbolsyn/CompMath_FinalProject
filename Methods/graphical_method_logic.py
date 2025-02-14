@@ -22,21 +22,21 @@ class GraphicalMethodWindow(QMainWindow):
         function_label = QLabel("Enter the function f(x):", self)
         layout.addWidget(function_label)
         self.function_input = QLineEdit(self)
-        self.function_input.setPlaceholderText("e.g., x**3 - 4*x + 1")
+        self.function_input.setPlaceholderText("e.g., x**3 - 3*x + 2")
         layout.addWidget(self.function_input)
 
         # Label and input for interval start
         interval_start_label = QLabel("Enter the start of the interval:", self)
         layout.addWidget(interval_start_label)
         self.interval_start_input = QLineEdit(self)
-        self.interval_start_input.setPlaceholderText("e.g., 0")
+        self.interval_start_input.setPlaceholderText("e.g., -2")
         layout.addWidget(self.interval_start_input)
 
         # Label and input for interval end
         interval_end_label = QLabel("Enter the end of the interval:", self)
         layout.addWidget(interval_end_label)
         self.interval_end_input = QLineEdit(self)
-        self.interval_end_input.setPlaceholderText("e.g., 3")
+        self.interval_end_input.setPlaceholderText("e.g., 2")
         layout.addWidget(self.interval_end_input)
 
         # Button to plot graph
